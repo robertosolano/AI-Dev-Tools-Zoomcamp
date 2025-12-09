@@ -1,6 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export default function Terminal({ code, language, output, setOutput }) {
+    const pyodideRef = useRef(null);
+    const isPyodideLoading = useRef(false);
+
+    useEffect(() => {
+        // Initialize Pyodide if needed
+        async function loadPyodideEnv() {
+            if (!pyodideRef.current && !isPyodideLoading.current && window.loadPyodide) {
+                isPyodideLoading.current = true;
+                try {
+                    setOutput(prev => [...prev, '> Initializing Python environment...']);
+                    const pyodide = await window.loadPyodide();
+                    // Redirect stdout using setCloud (custom) or just capture it per run?
+                    // Pyodide's runPython doesn't easily return printed output unless captured.
+                    // We can override standard out.
+                    pyodide.setStdout({
+                        batched: (msg) => {
+                            setOutput(prev => [...prev, msg]);
+                        }
+                    });
+                    pyodideRef.current = pyodide;
+                    setOutput(prev => [...prev, '> Python environment ready.']);
+                } catch (e) {
+                    console.error(e);
+                    setOutput(prev => [...prev, '> Failed to load Python environment.']);
+                } finally {
+                    isPyodideLoading.current = false;
+                }
+            }
+        }
+
+        if (language === 'python') {
+            loadPyodideEnv();
+        }
+    }, [language, setOutput]);
 
     useEffect(() => {
         const handleRun = () => {
@@ -9,6 +43,8 @@ export default function Terminal({ code, language, output, setOutput }) {
 
             if (language === 'javascript') {
                 runJS();
+            } else if (language === 'python') {
+                runPython();
             } else {
                 setOutput(prev => [...prev, `Execution for ${language} is not supported in browser-only mode yet.`]);
             }
@@ -18,8 +54,25 @@ export default function Terminal({ code, language, output, setOutput }) {
         return () => document.removeEventListener('run-code', handleRun);
     }, [code, language]);
 
+    const runPython = async () => {
+        if (!pyodideRef.current) {
+            setOutput(prev => [...prev, '> Python environment is causing issues or loading... wait a moment.']);
+            return;
+        }
+
+        setOutput(prev => [...prev, '> Running Python...']);
+        try {
+            // We use runPythonAsync to ensure async code works if needed, 
+            // though for simple prints synchronous runPython is fine.
+            // stdout is captured by setStdout in init.
+            await pyodideRef.current.runPythonAsync(code);
+        } catch (err) {
+            setOutput(prev => [...prev, `Error: ${err.message}`]);
+        }
+    };
+
     const runJS = () => {
-        setOutput(prev => [...prev, '> Running...']);
+        setOutput(prev => [...prev, '> Running JS...']);
 
         try {
             const workerCode = `

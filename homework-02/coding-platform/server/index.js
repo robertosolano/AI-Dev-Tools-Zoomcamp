@@ -6,6 +6,15 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
+// Serve static files from the public directory (React build)
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Handle SPA routing: return index.html for any unknown route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
