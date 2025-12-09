@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export default function Terminal({ code, language, output, setOutput }) {
+export default function Terminal({ code, language, output, setOutput, validationScript }) {
     const pyodideRef = useRef(null);
     const isPyodideLoading = useRef(false);
 

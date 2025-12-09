@@ -19,6 +19,16 @@ export default function EditorRoom() {
     const [layout, setLayout] = useState('horizontal');
     const [testMode, setTestMode] = useState(false);
     const [questions, setQuestions] = useState([]);
+    const [currentQuestion, setCurrentQuestion] = useState(null);
+    const [validationScript, setValidationScript] = useState(null);
+
+    useEffect(() => {
+        if (testMode && currentQuestion && currentQuestion.validationCode) {
+            setValidationScript(currentQuestion.validationCode[language]);
+        } else {
+            setValidationScript(null);
+        }
+    }, [testMode, currentQuestion, language]);
 
     useEffect(() => {
         const s = io(SOCKET_URL);
@@ -79,6 +89,7 @@ export default function EditorRoom() {
         const starter = question.starterCode[language] || '// No starter code for this language';
         setCode(starter);
         socket?.emit('code-change', { roomId, code: starter });
+        setCurrentQuestion(question);
     };
 
     return (
@@ -115,7 +126,13 @@ export default function EditorRoom() {
                         />
                     </div>
                     <div className="terminal-pane">
-                        <Terminal code={code} language={language} output={output} setOutput={setOutput} />
+                        <Terminal
+                            code={code}
+                            language={language}
+                            output={output}
+                            setOutput={setOutput}
+                            validationScript={validationScript}
+                        />
                     </div>
                 </div>
             </div>
