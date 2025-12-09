@@ -13,6 +13,7 @@ WORKDIR /app
 # Setup Server
 COPY server/package*.json ./server/
 WORKDIR /app/server
+ENV NODE_ENV=production
 RUN npm install --production
 
 # Copy Server Code

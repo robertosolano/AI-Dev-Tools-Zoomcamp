@@ -1,4 +1,6 @@
-body, html, #root {
+body,
+html,
+#root {
     margin: 0;
     padding: 0;
     height: 100%;
@@ -32,7 +34,8 @@ body, html, #root {
     padding: 0 20px;
 }
 
-.header-left, .header-right {
+.header-left,
+.header-right {
     display: flex;
     align-items: center;
     gap: 15px;
@@ -49,16 +52,41 @@ body, html, #root {
     overflow: hidden;
 }
 
+.main-area.horizontal {
+    flex-direction: row;
+}
+
+.main-area.vertical {
+    flex-direction: column;
+}
+
+/* Critical fix for Flexbox + Monaco: prevents overflow issues */
+.editor-pane,
+.terminal-pane {
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+}
+
 .editor-pane {
-    flex: 2; /* 66% width */
+    flex: 2;
     border-right: 1px solid #333;
+    /* When vertical, we need to reset border and set height */
+}
+
+.main-area.vertical .editor-pane {
+    border-right: none;
+    border-bottom: 2px solid #ccc;
+    /* Make divider more visible */
 }
 
 .terminal-pane {
-    flex: 1; /* 33% width */
-    background-color: #1e1e1e;
+    flex: 1;
     display: flex;
     flex-direction: column;
+    /* White background as requested */
+    background-color: #ffffff;
+    color: #000000;
 }
 
 .run-btn {
