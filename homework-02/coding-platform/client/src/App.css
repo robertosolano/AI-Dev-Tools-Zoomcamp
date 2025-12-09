@@ -1,0 +1,84 @@
+body, html, #root {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    background-color: #1e1e1e;
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.home-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.room-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.header {
+    height: 50px;
+    background-color: #252526;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+}
+
+.header-left, .header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo {
+    font-weight: bold;
+    color: #61dafb;
+}
+
+.main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.editor-pane {
+    flex: 2; /* 66% width */
+    border-right: 1px solid #333;
+}
+
+.terminal-pane {
+    flex: 1; /* 33% width */
+    background-color: #1e1e1e;
+    display: flex;
+    flex-direction: column;
+}
+
+.run-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 4px;
+}
+
+.run-btn:hover {
+    background-color: #218838;
+}
+
+.lang-select {
+    padding: 5px;
+    background-color: #3c3c3c;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
