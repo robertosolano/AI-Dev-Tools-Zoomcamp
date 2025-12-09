@@ -1,0 +1,1 @@
+# Empty requirements file to prevent Render/Buildpacks from failing if they detect Python files

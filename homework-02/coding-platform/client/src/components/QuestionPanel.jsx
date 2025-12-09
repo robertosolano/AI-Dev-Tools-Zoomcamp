@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function QuestionPanel({ questions, onClose, onSelect }) {
+export default function QuestionPanel({ questions, onClose, onSelect, onValidate, validationResult }) {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     const currentQuestion = questions[currentIndex];
@@ -15,6 +15,10 @@ export default function QuestionPanel({ questions, onClose, onSelect }) {
 
     const handleLoad = () => {
         onSelect(currentQuestion);
+    };
+
+    const handleValidate = () => {
+        onValidate();
     };
 
     return (
@@ -41,6 +45,24 @@ export default function QuestionPanel({ questions, onClose, onSelect }) {
             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button onClick={handleLoad} style={{ padding: '8px', backgroundColor: '#0078d4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                     Load into Editor
+                </button>
+
+                {validationResult && (
+                    <div style={{
+                        padding: '10px',
+                        borderRadius: '4px',
+                        textAlign: 'center',
+                        fontWeight: 'bold',
+                        backgroundColor: validationResult === 'PASSED' ? 'rgba(40, 167, 69, 0.2)' : 'rgba(220, 53, 69, 0.2)',
+                        color: validationResult === 'PASSED' ? '#28a745' : '#dc3545',
+                        border: validationResult === 'PASSED' ? '1px solid #28a745' : '1px solid #dc3545'
+                    }}>
+                        {validationResult === 'PASSED' ? '✅ Did it Pass? YES!' : '❌ Did it Pass? NO'}
+                    </div>
+                )}
+
+                <button onClick={handleValidate} style={{ padding: '8px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    Validate Answer
                 </button>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <button onClick={handlePrev} disabled={currentIndex === 0} style={{ padding: '5px 10px', opacity: currentIndex === 0 ? 0.5 : 1 }}>Prev</button>

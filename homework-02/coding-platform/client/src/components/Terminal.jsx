@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export default function Terminal({ code, language, output, setOutput, validationScript }) {
+export default function Terminal({ code, language, output, setOutput, validationScript, onValidationResult }) {
     const pyodideRef = useRef(null);
     const isPyodideLoading = useRef(false);
 
@@ -13,9 +13,7 @@ export default function Terminal({ code, language, output, setOutput, validation
                 try {
                     setOutput(prev => [...prev, '> Initializing Python environment...']);
                     const pyodide = await window.loadPyodide();
-                    // Redirect stdout using setCloud (custom) or just capture it per run?
-                    // Pyodide's runPython doesn't easily return printed output unless captured.
-                    // We can override standard out.
+                    // Redirect stdout
                     pyodide.setStdout({
                         batched: (msg) => {
                             console.log('[Terminal] Pyodide stdout:', msg);
@@ -42,15 +40,20 @@ export default function Terminal({ code, language, output, setOutput, validation
     }, [language, setOutput]);
 
     useEffect(() => {
-        const handleRun = () => {
-            console.log('[Terminal] Received run-code event for language:', language);
+        const handleRun = (e) => {
+            const shouldValidate = e.detail && e.detail.validate;
+
             // Clear previous output
             setOutput([]);
+            // Reset validation result
+            if (onValidationResult) onValidationResult(null);
+
+            const codeToRun = (shouldValidate && validationScript) ? (code + '\n' + validationScript) : code;
 
             if (language === 'javascript') {
-                runJS();
+                runJS(codeToRun, shouldValidate);
             } else if (language === 'python') {
-                runPython();
+                runPython(codeToRun, shouldValidate);
             } else {
                 setOutput(prev => [...prev, `Execution for ${language} is not supported in browser-only mode yet.`]);
             }
@@ -58,42 +61,46 @@ export default function Terminal({ code, language, output, setOutput, validation
 
         document.addEventListener('run-code', handleRun);
         return () => document.removeEventListener('run-code', handleRun);
-    }, [code, language]);
+    }, [code, language, validationScript, onValidationResult]);
 
-    const runPython = async () => {
-        console.log('[Terminal] runPython called');
+    // Monitor output for tokens to trigger callback
+    useEffect(() => {
+        const fullOutput = output.join('\n');
+        if (fullOutput.includes('---VALIDATION---')) {
+            if (fullOutput.includes('PASSED')) {
+                const lastLine = output[output.length - 1];
+                // Simple loose check to allow async updates to settle
+                if (lastLine && ((typeof lastLine === 'string' && lastLine.includes('PASSED')) || output.some(l => typeof l === 'string' && l.includes('PASSED')))) {
+                    if (onValidationResult) onValidationResult('PASSED');
+                }
+            } else if (fullOutput.includes('FAILED') || fullOutput.includes('ERROR')) {
+                if (onValidationResult) onValidationResult('FAILED');
+            }
+        }
+    }, [output, onValidationResult]);
+
+    const runPython = async (codeToRun, isValidation) => {
         if (!pyodideRef.current) {
-            console.warn('[Terminal] Pyodide not ready yet.');
-            setOutput(prev => [...prev, '> Python environment is causing issues or loading... wait a moment.']);
+            setOutput(prev => [...prev, '> Python environment loading...']);
             return;
         }
 
-        setOutput(prev => [...prev, '> Running Python...']);
+        setOutput(prev => [...prev, isValidation ? '> Validating solution...' : '> Running Python...']);
         try {
-            console.log('[Terminal] Executing Python code:', code);
-            // We use runPythonAsync to ensure async code works if needed, 
-            // though for simple prints synchronous runPython is fine.
-            // stdout is captured by setStdout in init.
-            await pyodideRef.current.runPythonAsync(code);
-            console.log('[Terminal] Python execution completed (async).');
+            await pyodideRef.current.runPythonAsync(codeToRun);
         } catch (err) {
             console.error('[Terminal] Python error:', err);
             setOutput(prev => [...prev, `Error: ${err.message}`]);
         }
     };
 
-    const runJS = () => {
-        console.log('[Terminal] runJS called');
-        setOutput(prev => [...prev, '> Running JS...']);
+    const runJS = (codeToRun, isValidation) => {
+        setOutput(prev => [...prev, isValidation ? '> Validating solution...' : '> Running JS...']);
 
         try {
             const workerCode = `
                 self.onmessage = function(e) {
                     const code = e.data;
-                    // Native log for debugging the worker itself
-                    const nativeLog = self.console.log;
-                    nativeLog('Worker received code');
-
                     const console = {
                         log: (...args) => self.postMessage({ type: 'log', data: args.join(' ') }),
                         error: (...args) => self.postMessage({ type: 'error', data: args.join(' ') }),
@@ -102,18 +109,9 @@ export default function Terminal({ code, language, output, setOutput, validation
                     };
                     
                     try {
-                        // Capture return value
-                        // We use 'console' as an argument to shadow the global one
-                        const result = new Function('console', code)(console);
-                        
-                        if (result !== undefined) {
-                            self.postMessage({ type: 'log', data: 'Return: ' + result });
-                        }
-                        
-                        nativeLog('Worker execution done, sending done message');
+                        new Function('console', code)(console);
                         self.postMessage({ type: 'done' });
                     } catch (err) {
-                        nativeLog('Worker error', err);
                         self.postMessage({ type: 'error', data: err.toString() });
                     }
                 };
@@ -121,43 +119,46 @@ export default function Terminal({ code, language, output, setOutput, validation
 
             const blob = new Blob([workerCode], { type: 'application/javascript' });
             const worker = new Worker(URL.createObjectURL(blob));
-
-            // Keep track if we finished
             let isDone = false;
 
             worker.onmessage = (e) => {
                 const { type, data } = e.data;
-                console.log('[Terminal] Worker message:', type, data);
-                if (type === 'log') {
-                    setOutput(prev => [...prev, data]);
-                } else if (type === 'error') {
-                    setOutput(prev => [...prev, `Error: ${data}`]);
-                } else if (type === 'done') {
-                    isDone = true;
-                    worker.terminate();
-                }
+                if (type === 'log') setOutput(prev => [...prev, data]);
+                else if (type === 'error') setOutput(prev => [...prev, `Error: ${data}`]);
+                else if (type === 'done') { isDone = true; worker.terminate(); }
             };
 
             worker.onerror = (e) => {
-                console.error('[Terminal] Worker error:', e.message);
                 setOutput(prev => [...prev, `Worker Error: ${e.message}`]);
                 worker.terminate();
             };
 
             setTimeout(() => {
                 if (!isDone) {
-                    console.warn('[Terminal] Worker timeout - Force terminating');
                     setOutput(prev => [...prev, '> Execution timed out.']);
                     worker.terminate();
                 }
-            }, 5000); // 5s timeout
+            }, 5000);
 
-            worker.postMessage(code);
+            worker.postMessage(codeToRun);
 
         } catch (e) {
-            console.error('[Terminal] Setup error:', e);
             setOutput(prev => [...prev, `Error: ${e.message}`]);
         }
+    };
+
+    const getLineColor = (line) => {
+        if (typeof line !== 'string') return '#000';
+        if (line.includes('PASSED')) return '#28a745';
+        if (line.includes('FAILED')) return '#d32f2f';
+        if (line.startsWith('Error') || line.startsWith('Worker Error')) return '#d32f2f';
+        if (line.startsWith('>')) return '#666';
+        return '#000';
+    };
+
+    const getLineWeight = (line) => {
+        if (typeof line === 'string' && (line.includes('PASSED') || line.includes('FAILED'))) return 'bold';
+        return 'normal';
     };
 
     return (
@@ -165,7 +166,12 @@ export default function Terminal({ code, language, output, setOutput, validation
             <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', textTransform: 'uppercase', color: '#333' }}>Output</h3>
             <div style={{ borderTop: '1px solid #ccc', padding: '10px 0' }}>
                 {output.map((line, i) => (
-                    <div key={i} style={{ whiteSpace: 'pre-wrap', marginBottom: '2px', color: line.startsWith('Error') || line.startsWith('Worker Error') ? '#d32f2f' : '#000' }}>
+                    <div key={i} style={{
+                        whiteSpace: 'pre-wrap',
+                        marginBottom: '2px',
+                        color: getLineColor(line),
+                        fontWeight: getLineWeight(line)
+                    }}>
                         {line}
                     </div>
                 ))}
