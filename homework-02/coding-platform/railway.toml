@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd homework-02/coding-platform && ./build.sh"
+
+[deploy]
+startCommand = "cd homework-02/coding-platform/server && npm start"
